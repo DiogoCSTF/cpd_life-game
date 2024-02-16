@@ -41,6 +41,32 @@ vector<vector<vector<int>>> gen_initial_grid(long long N, float density, int inp
     return grid;
 }
 
+// Compare and modify function
+void compare_and_modify(vector<int> &max, vector<int> &maximum)
+{
+    for (int i = 0; i < N_SPECIES; i++) {
+        if (max[i] > maximum[i]) {
+            maximum[i] = max[i];
+        }
+    }
+}
+
+// Calculates the maximum of each species
+void info_of_gen(vector<vector<vector<int>>> &grid, vector<int> &maximum, long long N)
+{
+    vector<int> max(N_SPECIES, 0);
+    for (int x = 0; x < N; x++) {
+        for (int y = 0; y < N; y++) {
+            for (int z = 0; z < N; z++) {
+                int species = grid[x][y][z];
+                if (species != 0)
+                    max[species-1]++;        
+            }
+        }
+    }
+    compare_and_modify(max, maximum);
+}
+
 // Simulates one generation
 void gen_generation(vector<vector<vector<int>>> &grid, long long N)
 {
@@ -70,9 +96,15 @@ void print_grid(vector<vector<vector<int>>> &grid, long long N) {
 // Simulates all generations
 vector<vector<vector<int>>> full_generation(long long gens, long long N, float density, int seed)
 {
+    vector<int> maximum(N_SPECIES, 0);
     vector<vector<vector<int>>> grid = gen_initial_grid(N, density, seed);
     print_grid(grid,N);
     for (int x = 0; x < gens; x++) {
+        info_of_gen(grid, maximum, N);
+        for (int i = 0; i < N_SPECIES; i++) {
+            cout << maximum[i] << " ";
+        }
+        cout << endl;
         gen_generation(grid, N);
     }
     return grid;
