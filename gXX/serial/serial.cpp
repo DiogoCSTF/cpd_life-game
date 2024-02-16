@@ -66,17 +66,32 @@ void info_of_gen(vector<vector<vector<int>>> &grid, vector<int> &maximum, long l
     }
     compare_and_modify(max, maximum);
 }
+/*
+Duvidas:
+- tem de se mudar todos os x,y,z para long long???
+
+
+
+*/
+
+
+// Visits node
+int visit_node(vector<vector<vector<int>>> &grid, int x, int y, int z) {
+    return 0;
+}
 
 // Simulates one generation
-void gen_generation(vector<vector<vector<int>>> &grid, long long N)
+vector<vector<vector<int>>> gen_generation(vector<vector<vector<int>>> &grid, long long N)
 {
+    vector<vector<vector<int>>> new_grid(N, vector<vector<int>>(N, vector<int>(N)));
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
             for (int z = 0; z < N; z++) {
-                //do things            
+                new_grid[x][y][z] = visit_node(grid, x, y, z);         
             }
         }
     }
+    return new_grid;
 }
 
 // Prints the grid
@@ -105,7 +120,7 @@ vector<vector<vector<int>>> full_generation(long long gens, long long N, float d
             cout << maximum[i] << " ";
         }
         cout << endl;
-        gen_generation(grid, N);
+        grid = gen_generation(grid, N);
     }
     return grid;
 }
