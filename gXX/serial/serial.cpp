@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
     int seed = atoi(argv[4]);
     cout << generations << " " << N << " " << density << " " << seed << endl;
 
-    vector<vector<vector<int>>> grid = gen_initial_grid(N, density, seed);~
+    vector<vector<vector<int>>> grid = gen_initial_grid(N, density, seed);
     /*
     for (int x = 0; x < N; x++) {
         cout << "Layer " << x << ":" << endl;
