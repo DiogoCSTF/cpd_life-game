@@ -6,12 +6,12 @@
 using namespace std;
 
 unsigned int seed;
-
+// Initial seed
 void init_r4uni(int input_seed)
 {
     seed = input_seed + 987654321;
 }
-
+// Randomizer
 float r4_uni()
 {
     int seed_in = seed;
@@ -23,7 +23,7 @@ float r4_uni()
     return 0.5 + 0.2328306e-09 * (seed_in + (int) seed);
 }
 
-
+// Genaration of initial grid
 vector<vector<vector<int>>> gen_initial_grid(long long N, float density, int input_seed)
 {
     vector<vector<vector<int>>> grid(N, vector<vector<int>>(N, vector<int>(N)));
@@ -41,21 +41,20 @@ vector<vector<vector<int>>> gen_initial_grid(long long N, float density, int inp
     return grid;
 }
 
-int main(int argc, char *argv[])
+// Simulates one generation
+void gen_generation(vector<vector<vector<int>>> &grid, long long N)
 {
-    if (argc != 5)
-    {
-        cout << "Usage: " << "<Generations> <N> <density> <seed>" << endl;
-        return 1;
+    for (int x = 0; x < N; x++) {
+        for (int y = 0; y < N; y++) {
+            for (int z = 0; z < N; z++) {
+                //do things            
+            }
+        }
     }
-    int generations = atoi(argv[1]);
-    long long N = atoll(argv[2]);
-    float density = atof(argv[3]);
-    int seed = atoi(argv[4]);
-    cout << generations << " " << N << " " << density << " " << seed << endl;
+}
 
-    vector<vector<vector<int>>> grid = gen_initial_grid(N, density, seed);
-    /*
+// Prints the grid
+void print_grid(vector<vector<vector<int>>> &grid, long long N) {
     for (int x = 0; x < N; x++) {
         cout << "Layer " << x << ":" << endl;
         for (int y = 0; y < N; y++) {
@@ -66,7 +65,30 @@ int main(int argc, char *argv[])
         }
         cout << endl;
     }
-    */
-    
+}
+
+// Simulates all generations
+vector<vector<vector<int>>> full_generation(long long gens, long long N, float density, int seed)
+{
+    vector<vector<vector<int>>> grid = gen_initial_grid(N, density, seed);
+    print_grid(grid,N);
+    for (int x = 0; x < gens; x++) {
+        gen_generation(grid, N);
+    }
+    return grid;
+}
+
+
+
+int main(int argc, char *argv[])
+{
+    if (argc != 5)
+    {
+        cout << "Usage: " << "<Generations> <N> <density> <seed>" << endl;
+        return 1;
+    }
+    cout << atoi(argv[1]) << " " << atoll(argv[2]) << " " << atof(argv[3]) << " " << atoi(argv[4]) << endl;
+
+    full_generation(atoi(argv[1]), atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
     return 0;
 }
