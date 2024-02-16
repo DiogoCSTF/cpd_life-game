@@ -1,3 +1,11 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+// Function declarations
+void init_r4uni(int input_seed);
+float r4_uni();
+char ***gen_initial_grid(long long N, float density, int input_seed);
+
 #define N_SPECIES 9
 
 unsigned int seed;
@@ -22,7 +30,7 @@ char ***gen_initial_grid(long long N, float density, int input_seed)
 {
     int x, y, z;
 
-    grid = (char ***) malloc(N * sizeof(char **));
+    char *** grid = (char ***) malloc(N * sizeof(char **));
     if(grid == NULL) {
         printf("Failed to allocate matrix\n");
         exit(1);
@@ -50,4 +58,23 @@ char ***gen_initial_grid(long long N, float density, int input_seed)
                     grid[x][y][z] = (int)(r4_uni() * N_SPECIES) + 1;
 
     return grid;
+}
+
+
+
+int main(int argc, char *argv[])
+{
+    if (argc != 5)
+    {
+        printf("Usage: <Generations> <N> <density> <seed>\n");
+        return 1;
+    }
+    int generations = atoi(argv[1]);
+    long long N = atoll(argv[2]);
+    float density = atof(argv[3]);
+    int seed = atoi(argv[4]);
+
+    char ***grid = gen_initial_grid(N, density, seed);
+
+    return 0;
 }
