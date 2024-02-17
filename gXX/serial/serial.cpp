@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cstdlib>
+#include <omp.h>
 
 #define N_SPECIES 9
 using namespace std;
@@ -76,21 +77,7 @@ void compare_and_modify(vector<int> &max, vector<vector<int>> &maximum, int epoc
     }
 }
 
-// Calculates the maximum of each species
-void info_of_gen(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum, int epoch, long long N)
-{
-    vector<int> max(N_SPECIES, 0);
-    for (int x = 0; x < N; x++) {
-        for (int y = 0; y < N; y++) {
-            for (int z = 0; z < N; z++) {
-                int species = grid[x][y][z];
-                if (species != 0)
-                    max[species-1]++;        
-            }
-        }
-    }
-    compare_and_modify(max, maximum, epoch);
-}
+
 /*
 Duvidas:
 - tem de se mudar todos os x,y,z para long long???
@@ -160,35 +147,50 @@ int visit_node(vector<vector<vector<int>>> &grid, long long N, int x, int y, int
     return alive_or_dead(grid, max, sum, x, y ,z);
 }
 
-// Simulates one generation
-vector<vector<vector<int>>> gen_generation(vector<vector<vector<int>>> &grid, long long N)
+// Calculates the maximum of each species
+void info_of_gen(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum, int epoch, long long N)
 {
-    vector<vector<vector<int>>> new_grid(N, vector<vector<int>>(N, vector<int>(N)));
+    vector<int> max(N_SPECIES, 0);
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
             for (int z = 0; z < N; z++) {
-                new_grid[x][y][z] = visit_node(grid, N, x, y, z);         
+                int species = grid[x][y][z];
+                if (species != 0)
+                    max[species-1]++;        
             }
         }
     }
+    compare_and_modify(max, maximum, epoch);
+}
+
+// Simulates one generation
+vector<vector<vector<int>>> gen_generation(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum, int epoch, long long N)
+{
+    vector<vector<vector<int>>> new_grid(N, vector<vector<int>>(N, vector<int>(N)));
+    vector<int> max(N_SPECIES, 0);
+
+    for (int x = 0; x < N; x++) {
+        for (int y = 0; y < N; y++) {
+            for (int z = 0; z < N; z++) {
+                int species = grid[x][y][z];
+                new_grid[x][y][z] = visit_node(grid, N, x, y, z);       
+                if (species != 0)
+                    max[species-1]++;      
+            }
+        }
+    }
+    compare_and_modify(max, maximum, epoch);
     return new_grid;
 }
 
 
 // Simulates all generations
-void full_generation(long long gens, long long N, float density, int seed)
-{
-    vector<vector<int>> maximum(N_SPECIES, vector<int>(2,0));
-    vector<vector<vector<int>>> grid = gen_initial_grid(N, density, seed);
-    //print_grid(grid,N);
+void full_generation(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum, long long gens, long long N, float density, int seed){
     for (int x = 0; x < gens; x++) {
-        info_of_gen(grid, maximum, x, N);
-        grid = gen_generation(grid, N);
-        //print_grid(grid,N);
+        grid = gen_generation(grid, maximum, x, N);
         cout << x << endl;
     }
     info_of_gen(grid, maximum, gens, N);
-    print_results(maximum);
 }
 
 
@@ -201,7 +203,15 @@ int main(int argc, char *argv[])
         return 1;
     }
     //cout << atoi(argv[1]) << " " << atoll(argv[2]) << " " << atof(argv[3]) << " " << atoi(argv[4]) << endl;
+    double exec_time;
+    vector<vector<vector<int>>> grid = gen_initial_grid(atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
+    vector<vector<int>> maximum(N_SPECIES, vector<int>(2,0));
 
-    full_generation(atoi(argv[1]), atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
+    exec_time = -omp_get_wtime();
+    full_generation(grid, maximum, atoi(argv[1]), atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
+    exec_time += omp_get_wtime();
+    fprintf(stderr, "%.1fs\n", exec_time);
+    print_results(maximum);
+
     return 0;
 }
