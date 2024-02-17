@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cstdlib>
+#include <omp.h>
 
 #define N_SPECIES 9
 using namespace std;
@@ -176,19 +177,14 @@ vector<vector<vector<int>>> gen_generation(vector<vector<vector<int>>> &grid, lo
 
 
 // Simulates all generations
-void full_generation(long long gens, long long N, float density, int seed)
+void full_generation(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum, long long gens, long long N, float density, int seed)
 {
-    vector<vector<int>> maximum(N_SPECIES, vector<int>(2,0));
-    vector<vector<vector<int>>> grid = gen_initial_grid(N, density, seed);
-    //print_grid(grid,N);
     for (int x = 0; x < gens; x++) {
         info_of_gen(grid, maximum, x, N);
         grid = gen_generation(grid, N);
-        //print_grid(grid,N);
         cout << x << endl;
     }
     info_of_gen(grid, maximum, gens, N);
-    print_results(maximum);
 }
 
 
@@ -201,7 +197,14 @@ int main(int argc, char *argv[])
         return 1;
     }
     //cout << atoi(argv[1]) << " " << atoll(argv[2]) << " " << atof(argv[3]) << " " << atoi(argv[4]) << endl;
+    double exec_time;
+    vector<vector<vector<int>>> grid = gen_initial_grid(atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
+    vector<vector<int>> maximum(N_SPECIES, vector<int>(2,0));
 
-    full_generation(atoi(argv[1]), atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
-    return 0;
+    exec_time = -omp_get_wtime();
+    full_generation(grid, maximum, atoi(argv[1]), atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
+    exec_time += omp_get_wtime();
+    fprintf(stderr, "%.1fs\n", exec_time);
+    print_results(maximum);
+
 }
