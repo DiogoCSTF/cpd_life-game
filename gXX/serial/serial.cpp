@@ -27,9 +27,8 @@ float r4_uni()
 }
 
 // Genaration of initial grid
-vector<vector<vector<int>>> gen_initial_grid(long long N, float density, int input_seed)
+void gen_initial_grid(int*** grid, long long N, float density, int input_seed)
 {
-    vector<vector<vector<int>>> grid(N, vector<vector<int>>(N, vector<int>(N)));
 
     init_r4uni(input_seed);
     for (int x = 0; x < N; x++) {
@@ -41,12 +40,34 @@ vector<vector<vector<int>>> gen_initial_grid(long long N, float density, int inp
             }
         }
     }
+}
+
+int*** gen_grid(long long N) {
+    int*** grid = (int ***) malloc(N * sizeof(int **));
+    if(grid == NULL) {
+        cout <<"Failed to allocate matrix\n";
+        exit(1);
+    }
+    for(int x = 0; x < N; x++) {
+        grid[x] = (int **) malloc(N * sizeof(int *));
+        if(grid[x] == NULL) {
+            cout <<"Failed to allocate matrix\n";
+            exit(1);
+        }
+        for(int y = 0; y < N; y++){
+            grid[x][y] = (int *) malloc(N * sizeof(int));
+            if(grid[x][0] == NULL) {
+                cout <<"Failed to allocate matrix\n";
+                exit(1);
+            }
+        }
+    }
     return grid;
 }
 
 
 // Prints the grid
-void print_grid(vector<vector<vector<int>>> &grid, long long N) {
+void print_grid(int*** grid, long long N) {
     for (int x = 0; x < N; x++) {
         cout << "Layer " << x << ":" << endl;
         for (int y = 0; y < N; y++) {
@@ -60,14 +81,14 @@ void print_grid(vector<vector<vector<int>>> &grid, long long N) {
 }
 
 // Prints the results
-void print_results(vector<vector<int>> &maximum){
+void print_results(int** maximum){
     for(int i = 0; i < N_SPECIES; i++){
         cout << i+1 << " " << maximum[i][0] << " " << maximum[i][1] << endl;
     }
 }
 
 // Compare and modify function
-void compare_and_modify(vector<int> &max, vector<vector<int>> &maximum, int epoch)
+void compare_and_modify(int* max, int** maximum, int epoch)
 {
     for (int i = 0; i < N_SPECIES; i++) {
         if (max[i] > maximum[i][0]) {
@@ -87,7 +108,7 @@ Duvidas:
 */
 
 // Fills vectors
-void fill_vector(vector<int> &dimentions, int dimention, long long N) {
+void fill_vector(int* dimentions, int dimention, long long N) {
     if (dimention == 0) dimentions[0] = N-1;
     else dimentions[0] = dimention-1;
 
@@ -97,7 +118,7 @@ void fill_vector(vector<int> &dimentions, int dimention, long long N) {
     else dimentions[2] = dimention+1;
 }
 
-int alive_neighbour(vector<int> &max) {
+int alive_neighbour(int* max) {
     int m = 0;
     int index = 0;
     for(int i = 0; i < N_SPECIES; i++) {
@@ -109,7 +130,7 @@ int alive_neighbour(vector<int> &max) {
     return index+1;
 }
 
-int alive_or_dead(vector<vector<vector<int>>> &grid, vector<int> &max, int sum, int x, int y, int z) {
+int alive_or_dead(int*** grid, int* max, int sum, int x, int y, int z) {
     if(grid[x][y][z] != 0){
         sum--;
         max[grid[x][y][z]-1]--;
@@ -122,15 +143,15 @@ int alive_or_dead(vector<vector<vector<int>>> &grid, vector<int> &max, int sum, 
 }
 
 // Visits node
-int visit_node(vector<vector<vector<int>>> &grid, long long N, int x, int y, int z) {
-    vector<int> xi = vector<int>(3);
-    vector<int> yi = vector<int>(3);
-    vector<int> zi = vector<int>(3);
+int visit_node(int*** grid, long long N, int x, int y, int z) {
+    int xi[3];
+    int yi[3];
+    int zi[3];
     fill_vector(xi,x,N);
     fill_vector(yi,y,N);
     fill_vector(zi,z,N);
 
-    vector<int> max(N_SPECIES, 0);
+    int max[N_SPECIES] = {0};
     int sum = 0;
 
     for (int xii : xi) {
@@ -148,9 +169,9 @@ int visit_node(vector<vector<vector<int>>> &grid, long long N, int x, int y, int
 }
 
 // Calculates the maximum of each species
-void info_of_gen(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum, int epoch, long long N)
+void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 {
-    vector<int> max(N_SPECIES, 0);
+    int max[N_SPECIES] = {0};
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
             for (int z = 0; z < N; z++) {
@@ -164,10 +185,9 @@ void info_of_gen(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum
 }
 
 // Simulates one generation
-vector<vector<vector<int>>> gen_generation(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum, int epoch, long long N)
+void gen_generation(int*** grid, int*** new_grid, int** maximum, int epoch, long long N)
 {
-    vector<vector<vector<int>>> new_grid(N, vector<vector<int>>(N, vector<int>(N)));
-    vector<int> max(N_SPECIES, 0);
+    int max[N_SPECIES] = {0};
 
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
@@ -180,17 +200,26 @@ vector<vector<vector<int>>> gen_generation(vector<vector<vector<int>>> &grid, ve
         }
     }
     compare_and_modify(max, maximum, epoch);
-    return new_grid;
 }
 
 
 // Simulates all generations
-void full_generation(vector<vector<vector<int>>> &grid, vector<vector<int>> &maximum, long long gens, long long N, float density, int seed){
+void full_generation(int*** grid1, int*** grid2, int** maximum, long long gens, long long N, float density, int seed){
+    bool grid_to_use = true;
+
     for (int x = 0; x < gens; x++) {
-        grid = gen_generation(grid, maximum, x, N);
+        if(grid_to_use){
+            gen_generation(grid1, grid2, maximum, x, N);
+            grid_to_use = false;
+        }
+        else {
+            gen_generation(grid2, grid1, maximum, x, N);
+            grid_to_use = true;
+        }
         cout << x << endl;
     }
-    info_of_gen(grid, maximum, gens, N);
+    if(grid_to_use) info_of_gen(grid1, maximum, gens, N);
+    else info_of_gen(grid2, maximum, gens, N);
 }
 
 
@@ -204,11 +233,20 @@ int main(int argc, char *argv[])
     }
     //cout << atoi(argv[1]) << " " << atoll(argv[2]) << " " << atof(argv[3]) << " " << atoi(argv[4]) << endl;
     double exec_time;
-    vector<vector<vector<int>>> grid = gen_initial_grid(atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
-    vector<vector<int>> maximum(N_SPECIES, vector<int>(2,0));
+    int*** grid1 = gen_grid(atoll(argv[2]));
+    int*** grid2 = gen_grid(atoll(argv[2]));
+    
+    int** maximum = new int*[N_SPECIES];
+    for (int i = 0; i < N_SPECIES; i++) {
+        maximum[i] = new int[2];
+        maximum[i][0] = 0;
+        maximum[i][1] = 0;
+    }
+
+    gen_initial_grid(grid1, atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
 
     exec_time = -omp_get_wtime();
-    full_generation(grid, maximum, atoi(argv[1]), atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
+    full_generation(grid1, grid2, maximum, atoi(argv[1]), atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
     exec_time += omp_get_wtime();
     fprintf(stderr, "%.1fs\n", exec_time);
     print_results(maximum);
