@@ -204,7 +204,7 @@ void gen_generation(int*** grid, int*** new_grid, int** maximum, int epoch, long
 
 
 // Simulates all generations
-void full_generation(int*** grid1, int*** grid2, int** maximum, long long gens, long long N, float density, int seed){
+void full_generation(int*** grid1, int*** grid2, int** maximum, int gens, long long N, float density, int seed){
     bool grid_to_use = true;
 
     for (int x = 0; x < gens; x++) {
