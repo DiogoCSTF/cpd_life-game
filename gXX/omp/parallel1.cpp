@@ -188,19 +188,21 @@ void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 void gen_generation(int*** grid, int*** new_grid, int** maximum, int epoch, long long N)
 {
     int max[N_SPECIES] = {0};
-
-    for (int x = 0; x < N; x++) {
-        for (int y = 0; y < N; y++) {
-            for (int z = 0; z < N; z++) {
-                int species = grid[x][y][z];
-                if (species != 0)
-                    max[species-1]++;      
-                new_grid[x][y][z] = visit_node(grid, N, x, y, z);   
+    #pragma omp parallel for
+        for (int x = 0; x < N; x++) {
+            for (int y = 0; y < N; y++) {
+                for (int z = 0; z < N; z++) {
+                    int species = grid[x][y][z];
+                    if (species != 0)
+                        #pragma omp atomic
+                            max[species-1]++;      
+                    new_grid[x][y][z] = visit_node(grid, N, x, y, z);   
+                }
             }
         }
-    }
     compare_and_modify(max, maximum, epoch);
 }
+
 
 
 // Simulates all generations
