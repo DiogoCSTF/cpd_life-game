@@ -172,7 +172,7 @@ int visit_node(int*** grid, long long N, int x, int y, int z) {
 void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 {
     int max[N_SPECIES] = {0};
-    #pragma omp parallel for reduction(+:max)
+    #pragma omp parallel for collapse(2) reduction(+:max)
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
             for (int z = 0; z < N; z++) {
