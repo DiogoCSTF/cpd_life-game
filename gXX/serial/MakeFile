@@ -1,5 +1,5 @@
 all:
-	g++ serial.cpp -fopenmp -o serial
+	g++ serial.cpp -O2 -fopenmp -o serial
 
 clean:
 	$(RM) serial
