@@ -271,33 +271,65 @@ int main(int argc, char *argv[])
     int** maximum = NULL;
     int** upper = NULL;
     int** lower = NULL;
-    int id = 0;
-    int p = 1;
+    int id, p, size, N;
+    N = atoll(argv[2]);
     MPI_Init (&argc, &argv);
 
     MPI_Comm_rank (MPI_COMM_WORLD, &id);
     MPI_Comm_size (MPI_COMM_WORLD, &p);
 
-
-    orig = gen_grid(atoll(argv[2]), 0, 1);
+    orig = gen_grid(N, 0, 1);
     maximum = new int*[N_SPECIES];
     for (int i = 0; i < N_SPECIES; i++) {
         maximum[i] = new int[2];
         maximum[i][0] = 0;
         maximum[i][1] = 0;
     }
-    orig = gen_grid(atoll(argv[2]), 0, 1);
-    gen_initial_grid(orig, atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
+    orig = gen_grid(N, 0, 1);
 
-    grid1 = gen_grid(atoll(argv[2]), id, p);
-    grid2 = gen_grid(atoll(argv[2]), id, p);
+    gen_initial_grid(orig, N, atof(argv[3]), atoi(argv[4]));
+
+    grid1 = gen_grid(N, id, p);
+    grid2 = gen_grid(N, id, p);
+
     // maybe usar pares de plaquettes para se puder ir trocando tipo os grids
-    upper = gen_plaquette(atoll(argv[2]));
-    lower = gen_plaquette(atoll(argv[2]));
-    copyFromOrig(orig, grid1, id, p, atoll(argv[2]));
+    upper = gen_plaquette(N);
+    lower = gen_plaquette(N);
+    if(id == p-1){
+        size = N/p;
+    } else 
+        size = ceil(N/p);
+    MPI_Request request1,request2, request3, request4;
+    if(!id){
+        for (int i = 0; i< N;i++) {
+            MPI_Isend(&grid1[0][i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request1);
+            MPI_Isend(&grid1[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2);
+        }
+        for (int i = 0; i< N;i++) {
+            MPI_Irecv(&upper[i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request3);        
+            MPI_Irecv(&lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4);    
+        }
+    }
+    else {
+        for (int i = 0; i< N;i++) {
+            MPI_Isend(&grid1[0][i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request1);
+            MPI_Isend(&grid1[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2);
+        }
+        for (int i = 0; i< N;i++) {
+            MPI_Irecv(&upper[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3);        
+            MPI_Irecv(&lower[i], N, MPI_INT, (id+1)%p, (id+1)%p, MPI_COMM_WORLD, &request4);  
+        }
+    }
+    MPI_Wait(&request3, MPI_STATUS_IGNORE);
+    MPI_Wait(&request4, MPI_STATUS_IGNORE);
+    MPI_Wait(&request1, MPI_STATUS_IGNORE);
+    MPI_Wait(&request2, MPI_STATUS_IGNORE);
+
+
+    copyFromOrig(orig, grid1, id, p, N);
     MPI_Barrier (MPI_COMM_WORLD);
     exec_time = - MPI_Wtime();
-    full_generation(grid1, grid2, maximum, atoi(argv[1]), atoll(argv[2]), atof(argv[3]), atoi(argv[4]));
+    full_generation(grid1, grid2, maximum, atoi(argv[1]), N, atof(argv[3]), atoi(argv[4]));
     exec_time += MPI_Wtime();
     MPI_Barrier (MPI_COMM_WORLD);
     if(!id){
