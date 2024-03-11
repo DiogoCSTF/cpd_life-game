@@ -143,10 +143,7 @@ int alive_or_dead(int*** grid, int* max, int sum, int x, int y, int z) {
 }
 
 // Visits node
-int visit_node(int*** grid, long long N, int x, int y, int z) {
-    int xi[3];
-    int yi[3];
-    int zi[3];
+int visit_node(int*** grid, long long N, int x, int y, int z, int* xi, int* yi, int* zi) {
     fill_vector(xi,x,N);
     fill_vector(yi,y,N);
     fill_vector(zi,z,N);
@@ -154,10 +151,10 @@ int visit_node(int*** grid, long long N, int x, int y, int z) {
     int max[N_SPECIES] = {0};
     int sum = 0;
 
-    for (int xii : xi) {
-        for (int yii : yi) {
-            for (int zii : zi) {
-                int species = grid[xii][yii][zii];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            for (int k = 0; k < 3; k++) {
+                int species = grid[xi[i]][yi[j]][zi[k]];
                 if (species != 0){
                     max[species-1]++;
                     sum++;
@@ -172,6 +169,7 @@ int visit_node(int*** grid, long long N, int x, int y, int z) {
 void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 {
     int max[N_SPECIES] = {0};
+    #pragma omp parallel for collapse(2) reduction(+:max)
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
             for (int z = 0; z < N; z++) {
@@ -188,20 +186,26 @@ void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 void gen_generation(int*** grid, int*** new_grid, int** maximum, int epoch, long long N)
 {
     int max[N_SPECIES] = {0};
-
-    for (int x = 0; x < N; x++) {
-        for (int y = 0; y < N; y++) {
-            for (int z = 0; z < N; z++) {
-                int species = grid[x][y][z];
-                if (species != 0)
-                    max[species-1]++;      
-                new_grid[x][y][z] = visit_node(grid, N, x, y, z);   
+    #pragma omp parallel
+    {
+        int xi[3];
+        int yi[3];
+        int zi[3];
+        #pragma omp for collapse(2) reduction(+:max)
+        for (int x = 0; x < N; x++) {
+            for (int y = 0; y < N; y++) {
+                for (int z = 0; z < N; z++) {
+                    int species = grid[x][y][z];
+                    if (species != 0)
+                        max[species-1]++;
+                    new_grid[x][y][z] = visit_node(grid, N, x, y, z, xi, yi, zi);
+                }
             }
         }
     }
     compare_and_modify(max, maximum, epoch);
 }
-
+// meter a contagem do primeiro fora do timer e aqui trocar o visit para o inicio e o max para depois (e usar o newgrid)
 
 // Simulates all generations
 void full_generation(int*** grid1, int*** grid2, int** maximum, int gens, long long N, float density, int seed){

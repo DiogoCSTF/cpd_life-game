@@ -172,13 +172,22 @@ int visit_node(int*** grid, long long N, int x, int y, int z) {
 void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 {
     int max[N_SPECIES] = {0};
-    for (int x = 0; x < N; x++) {
-        for (int y = 0; y < N; y++) {
-            for (int z = 0; z < N; z++) {
-                int species = grid[x][y][z];
-                if (species != 0)
-                    max[species-1]++;        
+    #pragma omp parallel
+    {
+        int maxT[N_SPECIES] = {0};
+        #pragma omp for nowait
+        for (int x = 0; x < N; x++) {
+            for (int y = 0; y < N; y++) {
+                for (int z = 0; z < N; z++) {
+                    int species = grid[x][y][z];
+                    if (species != 0)
+                        maxT[species-1]++;
+                }
             }
+        }
+        #pragma omp critical
+        for (int s = 0; s < N_SPECIES; s++) {
+                max[s] += maxT[s];
         }
     }
     compare_and_modify(max, maximum, epoch);
@@ -188,15 +197,23 @@ void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 void gen_generation(int*** grid, int*** new_grid, int** maximum, int epoch, long long N)
 {
     int max[N_SPECIES] = {0};
-
-    for (int x = 0; x < N; x++) {
-        for (int y = 0; y < N; y++) {
-            for (int z = 0; z < N; z++) {
-                int species = grid[x][y][z];
-                if (species != 0)
-                    max[species-1]++;      
-                new_grid[x][y][z] = visit_node(grid, N, x, y, z);   
+    #pragma omp parallel
+    {
+        int maxT[N_SPECIES] = {0};
+        #pragma omp for nowait
+        for (int x = 0; x < N; x++) {
+            for (int y = 0; y < N; y++) {
+                for (int z = 0; z < N; z++) {
+                    int species = grid[x][y][z];
+                    if (species != 0)
+                        maxT[species-1]++;
+                    new_grid[x][y][z] = visit_node(grid, N, x, y, z);
+                }
             }
+        }
+        #pragma omp critical
+        for (int s = 0; s < N_SPECIES; s++) {
+                max[s] += maxT[s];
         }
     }
     compare_and_modify(max, maximum, epoch);

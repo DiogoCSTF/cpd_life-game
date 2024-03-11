@@ -172,8 +172,10 @@ int visit_node(int*** grid, long long N, int x, int y, int z) {
 void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 {
     int max[N_SPECIES] = {0};
+    #pragma omp parallel for collapse(2) reduction(+:max)
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
+            #pragma omp simd
             for (int z = 0; z < N; z++) {
                 int species = grid[x][y][z];
                 if (species != 0)
@@ -188,20 +190,21 @@ void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
 void gen_generation(int*** grid, int*** new_grid, int** maximum, int epoch, long long N)
 {
     int max[N_SPECIES] = {0};
-
+    #pragma omp parallel for collapse(2) reduction(+:max)
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
+            #pragma omp simd
             for (int z = 0; z < N; z++) {
                 int species = grid[x][y][z];
                 if (species != 0)
-                    max[species-1]++;      
-                new_grid[x][y][z] = visit_node(grid, N, x, y, z);   
+                    max[species-1]++;
+                new_grid[x][y][z] = visit_node(grid, N, x, y, z);
             }
         }
     }
     compare_and_modify(max, maximum, epoch);
 }
-
+// meter a contagem do primeiro fora do timer e aqui trocar o visit para o inicio e o max para depois (e usar o newgrid)
 
 // Simulates all generations
 void full_generation(int*** grid1, int*** grid2, int** maximum, int gens, long long N, float density, int seed){
