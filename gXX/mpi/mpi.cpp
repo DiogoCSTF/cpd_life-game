@@ -126,7 +126,15 @@ void print_grid(int*** grid, long long N) {
         cout << endl;
     }
 }
-
+// Prints the grid
+void print_grid(int** grid, long long N) {
+    for (int y = 0; y < N; y++) {
+        for (int z = 0; z < N; z++) {
+            cout << grid[y][z] << " ";
+        }
+        cout << endl;
+    }
+}
 // Prints the results
 void print_results(int** maximum){
     for(int i = 0; i < N_SPECIES; i++){
@@ -277,7 +285,6 @@ void info_of_gen(int*** grid, int id, int p,int** maximum, int epoch, long long 
 // Simulates one generation
 void gen_generation(int*** grid, int*** new_grid, int** upper, int ** lower, int id, int p, int** maximum, int epoch, long long N)
 {
-    MPI_Request request1,request2, request3, request4;
     int size;
     // TODO NPROC TEM DE SER MENOR QUE N
     if (id == p-1 && N%p != 0) size = floor(N/p);
@@ -302,34 +309,43 @@ void gen_generation(int*** grid, int*** new_grid, int** upper, int ** lower, int
             }
         }
     }
+    MPI_Request request1[N] = {0};
+    MPI_Request request2[N] = {0};
+    MPI_Request request3[N] = {0};
+    MPI_Request request4[N] = {0};
+
     if(!id){
         for (int i = 0; i< N;i++) {
-            MPI_Isend(new_grid[0][i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request1);
-            MPI_Isend(new_grid[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2);
+            MPI_Isend(new_grid[0][i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request1[i]);
+            MPI_Isend(new_grid[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2[i]);
         }
         for (int i = 0; i< N;i++) {
-            MPI_Irecv(upper[i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request3);        
-            MPI_Irecv(lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4);    
+            MPI_Irecv(lower[i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request3[i]);        
+            MPI_Irecv(upper[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4[i]);    
         }
     }
     else {
         for (int i = 0; i< N;i++) {
-            MPI_Isend(new_grid[0][i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request1);
-            MPI_Isend(new_grid[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2);
+            MPI_Isend(new_grid[0][i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request1[i]);
+            MPI_Isend(new_grid[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2[i]);
         }
         for (int i = 0; i< N;i++) {
-            MPI_Irecv(upper[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3);        
-            MPI_Irecv(lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4);  
+            MPI_Irecv(lower[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3[i]);        
+            MPI_Irecv(upper[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4[i]);  
         }
     }
     MPI_Reduce (max, maxNew, N_SPECIES, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
     if(!id){
         compare_and_modify(maxNew, maximum, epoch);
     }
-    MPI_Wait(&request3, MPI_STATUS_IGNORE);
-    MPI_Wait(&request4, MPI_STATUS_IGNORE);
-    MPI_Wait(&request1, MPI_STATUS_IGNORE);
-    MPI_Wait(&request2, MPI_STATUS_IGNORE);
+    for (int i = 0; i< N;i++) {
+        MPI_Wait(&request3[i], MPI_STATUS_IGNORE);
+        MPI_Wait(&request4[i], MPI_STATUS_IGNORE);
+    }
+    for (int i = 0; i< N;i++) {
+        MPI_Wait(&request1[i], MPI_STATUS_IGNORE);
+        MPI_Wait(&request2[i], MPI_STATUS_IGNORE);
+    }
 }
 // meter a contagem do primeiro fora do timer e aqui trocar o visit para o inicio e o max para depois (e usar o newgrid)
 
@@ -401,15 +417,15 @@ int main(int argc, char *argv[])
     MPI_Request request2[N] = {0};
     MPI_Request request3[N] = {0};
     MPI_Request request4[N] = {0};
-
+    
     if(!id){
         for (int i = 0; i< N;i++) {
             MPI_Isend(grid1[0][i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request1[i]);
             MPI_Isend(grid1[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2[i]);
         }
         for (int i = 0; i< N;i++) {
-            MPI_Irecv(upper[i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request3[i]);        
-            MPI_Irecv(lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4[i]);    
+            MPI_Irecv(lower[i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request3[i]);        
+            MPI_Irecv(upper[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4[i]);    
         }
     }
     else {
@@ -418,8 +434,8 @@ int main(int argc, char *argv[])
             MPI_Isend(grid1[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2[i]);
         }
         for (int i = 0; i< N;i++) {
-            MPI_Irecv(upper[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3[i]);        
-            MPI_Irecv(lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4[i]);  
+            MPI_Irecv(lower[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3[i]);        
+            MPI_Irecv(upper[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4[i]);  
         }
     }
     for (int i = 0; i< N;i++) {
@@ -430,13 +446,12 @@ int main(int argc, char *argv[])
         MPI_Wait(&request1[i], MPI_STATUS_IGNORE);
         MPI_Wait(&request2[i], MPI_STATUS_IGNORE);
     }
-    for (int i =0; i<N; i++) {
+    /*for (int i =0; i<N; i++) {
         for (int j = 0; j<N; j++){
             cout << "kkk" << endl;
             cout << upper[i][j] << endl;
         }
-    }
-    MPI_Barrier (MPI_COMM_WORLD);
+    }*/
     exec_time = - MPI_Wtime();
     full_generation(grid1, grid2, upper, lower, id, p, maximum, atoi(argv[1]), N, atof(argv[3]), atoi(argv[4]));
     exec_time += MPI_Wtime();
