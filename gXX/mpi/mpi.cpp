@@ -215,13 +215,51 @@ int visit_node(int*** grid, long long N, int x, int y, int z) {
     }
     return alive_or_dead(grid, max, sum, x, y ,z);
 }
+int visit_node(int*** grid, int** recved, bool updown, long long N, int x, int y, int z) {
+    int xi[3];
+    int yi[3];
+    int zi[3];
+    fill_vector(xi,x,N);
+    fill_vector(yi,y,N);
+    fill_vector(zi,z,N);
 
+    int max[N_SPECIES] = {0};
+    int sum = 0;
+
+    for (int i = 0; i < 3; i++){
+        for (int yii : yi) {
+            for (int zii : zi) {
+                int species;
+                if (updown && i == 0){
+                    species = recved[yii][zii];
+                } else if (!updown && i == 2) {
+                    species = recved[yii][zii];
+                } else {
+                    species = grid[xi[i]][yii][zii];
+                }
+                if (species != 0){
+                    //cout << endl << xii << " " << yii << " " << zii << endl;
+                    max[species-1]++;
+                    sum++;
+                }    
+            }
+        }
+    }
+    
+    return alive_or_dead(grid, max, sum, x, y ,z);
+}
 // Calculates the maximum of each species
-void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
+void info_of_gen(int*** grid, int id, int p,int** maximum, int epoch, long long N)
 {
+    int size;
+    // TODO NPROC TEM DE SER MENOR QUE N
+    if (id == p-1 && N%p != 0) size = floor(N/p);
+    else size = ceil(N/p);
+
+    int maxNew[N_SPECIES] = {0};
     int max[N_SPECIES] = {0};
     #pragma omp parallel for collapse(2) reduction(+:max)
-    for (int x = 0; x < N; x++) {
+    for (int x = 0; x < size; x++) {
         for (int y = 0; y < N; y++) {
             #pragma omp simd
             for (int z = 0; z < N; z++) {
@@ -231,46 +269,89 @@ void info_of_gen(int*** grid, int** maximum, int epoch, long long N)
             }
         }
     }
-    compare_and_modify(max, maximum, epoch);
-}
+    MPI_Reduce (max, maxNew, N_SPECIES, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    if(!id){
+        compare_and_modify(maxNew, maximum, epoch);
+    }}
 
 // Simulates one generation
-void gen_generation(int*** grid, int*** new_grid, int** maximum, int epoch, long long N)
+void gen_generation(int*** grid, int*** new_grid, int** upper, int ** lower, int id, int p, int** maximum, int epoch, long long N)
 {
+    MPI_Request request1,request2, request3, request4;
+    int size;
+    // TODO NPROC TEM DE SER MENOR QUE N
+    if (id == p-1 && N%p != 0) size = floor(N/p);
+    else size = ceil(N/p);
+    int maxNew[N_SPECIES] = {0};
     int max[N_SPECIES] = {0};
-    #pragma omp parallel for collapse(2) reduction(+:max)
-    for (int x = 0; x < N; x++) {
+    #pragma omp parallel for reduction(+:max)
+    for (int x = 0; x < size; x++) {
         for (int y = 0; y < N; y++) {
             #pragma omp simd
             for (int z = 0; z < N; z++) {
                 int species = grid[x][y][z];
                 if (species != 0)
                     max[species-1]++;
-                new_grid[x][y][z] = visit_node(grid, N, x, y, z);
+                if (x == 0) {
+                    new_grid[x][y][z] = visit_node(grid, upper, true, N, x, y, z);
+                } else if (x == size-1) {
+                    new_grid[x][y][z] = visit_node(grid, lower, false, N, x, y, z);
+                }else {
+                    new_grid[x][y][z] = visit_node(grid, N, x, y, z);
+                }
             }
         }
     }
-    compare_and_modify(max, maximum, epoch);
+    if(!id){
+        for (int i = 0; i< N;i++) {
+            MPI_Isend(new_grid[0][i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request1);
+            MPI_Isend(new_grid[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2);
+        }
+        for (int i = 0; i< N;i++) {
+            MPI_Irecv(upper[i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request3);        
+            MPI_Irecv(lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4);    
+        }
+    }
+    else {
+        for (int i = 0; i< N;i++) {
+            MPI_Isend(new_grid[0][i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request1);
+            MPI_Isend(new_grid[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2);
+        }
+        for (int i = 0; i< N;i++) {
+            MPI_Irecv(upper[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3);        
+            MPI_Irecv(lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4);  
+        }
+    }
+    MPI_Reduce (max, maxNew, N_SPECIES, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    if(!id){
+        compare_and_modify(maxNew, maximum, epoch);
+    }
+    MPI_Wait(&request3, MPI_STATUS_IGNORE);
+    MPI_Wait(&request4, MPI_STATUS_IGNORE);
+    MPI_Wait(&request1, MPI_STATUS_IGNORE);
+    MPI_Wait(&request2, MPI_STATUS_IGNORE);
 }
 // meter a contagem do primeiro fora do timer e aqui trocar o visit para o inicio e o max para depois (e usar o newgrid)
 
 // Simulates all generations
-void full_generation(int*** grid1, int*** grid2, int** maximum, int gens, long long N, float density, int seed){
+void full_generation(int*** grid1, int*** grid2, int** upper, int ** lower, int id, int p, int** maximum, int gens, long long N, float density, int seed){
     bool grid_to_use = true;
 
     for (int x = 0; x < gens; x++) {
         if(grid_to_use){
-            gen_generation(grid1, grid2, maximum, x, N);
+            gen_generation(grid1, grid2, upper, lower, id, p, maximum, x, N);
             grid_to_use = false;
         }
         else {
-            gen_generation(grid2, grid1, maximum, x, N);
+            gen_generation(grid2, grid1, upper, lower, id, p, maximum, x, N);
             grid_to_use = true;
         }
-        cout << x << endl;
+        if (!id){
+            cout << x << endl;
+        }
     }
-    if(grid_to_use) info_of_gen(grid1, maximum, gens, N);
-    else info_of_gen(grid2, maximum, gens, N);
+    if(grid_to_use) info_of_gen(grid1, id, p, maximum, gens, N);
+    else info_of_gen(grid2, id, p, maximum, gens, N);
 }
 
 
@@ -311,39 +392,53 @@ int main(int argc, char *argv[])
     // maybe usar pares de plaquettes para se puder ir trocando tipo os grids
     upper = gen_plaquette(N);
     lower = gen_plaquette(N);
+    
     if(id == p-1){
         size = N/p;
     } else 
         size = ceil(N/p);
-    MPI_Request request1,request2, request3, request4;
+    MPI_Request request1[N] = {0};
+    MPI_Request request2[N] = {0};
+    MPI_Request request3[N] = {0};
+    MPI_Request request4[N] = {0};
+
     if(!id){
         for (int i = 0; i< N;i++) {
-            MPI_Isend(&grid1[0][i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request1);
-            MPI_Isend(&grid1[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2);
+            MPI_Isend(grid1[0][i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request1[i]);
+            MPI_Isend(grid1[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2[i]);
         }
         for (int i = 0; i< N;i++) {
-            MPI_Irecv(&upper[i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request3);        
-            MPI_Irecv(&lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4);    
+            MPI_Irecv(upper[i], N, MPI_INT, p-1, i, MPI_COMM_WORLD, &request3[i]);        
+            MPI_Irecv(lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4[i]);    
         }
     }
     else {
         for (int i = 0; i< N;i++) {
-            MPI_Isend(&grid1[0][i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request1);
-            MPI_Isend(&grid1[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2);
+            MPI_Isend(grid1[0][i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request1[i]);
+            MPI_Isend(grid1[size-1][i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request2[i]);
         }
         for (int i = 0; i< N;i++) {
-            MPI_Irecv(&upper[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3);        
-            MPI_Irecv(&lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4);  
+            MPI_Irecv(upper[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3[i]);        
+            MPI_Irecv(lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4[i]);  
         }
     }
-    MPI_Wait(&request3, MPI_STATUS_IGNORE);
-    MPI_Wait(&request4, MPI_STATUS_IGNORE);
-    MPI_Wait(&request1, MPI_STATUS_IGNORE);
-    MPI_Wait(&request2, MPI_STATUS_IGNORE);
-    
+    for (int i = 0; i< N;i++) {
+        MPI_Wait(&request3[i], MPI_STATUS_IGNORE);
+        MPI_Wait(&request4[i], MPI_STATUS_IGNORE);
+    }
+    for (int i = 0; i< N;i++) {
+        MPI_Wait(&request1[i], MPI_STATUS_IGNORE);
+        MPI_Wait(&request2[i], MPI_STATUS_IGNORE);
+    }
+    for (int i =0; i<N; i++) {
+        for (int j = 0; j<N; j++){
+            cout << "kkk" << endl;
+            cout << upper[i][j] << endl;
+        }
+    }
     MPI_Barrier (MPI_COMM_WORLD);
     exec_time = - MPI_Wtime();
-    full_generation(grid1, grid2, maximum, atoi(argv[1]), N, atof(argv[3]), atoi(argv[4]));
+    full_generation(grid1, grid2, upper, lower, id, p, maximum, atoi(argv[1]), N, atof(argv[3]), atoi(argv[4]));
     exec_time += MPI_Wtime();
     if(!id){
         fprintf(stderr, "%.1fs\n", exec_time);
