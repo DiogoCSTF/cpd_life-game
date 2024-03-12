@@ -29,15 +29,23 @@ float r4_uni()
 }
 
 // Genaration of initial grid
-void gen_initial_grid(int*** grid, long long N, float density, int input_seed)
+void gen_initial_grid(int*** grid, long long N, float density, int input_seed, int id, int p)
 {
+    int start = id * (N / p);
+    int end;
+    if (id == p - 1) end = N; 
+    else end = start + (N / p);
 
     init_r4uni(input_seed);
     for (int x = 0; x < N; x++) {
         for (int y = 0; y < N; y++) {
             for (int z = 0; z < N; z++) {
                 if(r4_uni() < density) {
-                    grid[x][y][z] = (int)(r4_uni() * N_SPECIES) + 1;
+                    int species = (int)(r4_uni() * N_SPECIES) + 1;
+                    if( x>=start && x<end) {
+                        //cout << x << " " << y << " " << z << id << endl;
+                        grid[x-start][y][z] = species;
+                    }
                 }                
             }
         }
@@ -52,9 +60,12 @@ int** gen_plaquette(long long N) {
     }
     for(int y = 0; y < N; y++){
         grid[y] = (int *) malloc(N * sizeof(int));
-        if(grid[0] == NULL) {
+        if(grid[y] == NULL) {
             cout <<"Failed to allocate matrix\n";
             exit(1);
+        }
+        for(int z = 0; z < N; z++){
+            grid[y][z] = 0;
         }
     }
     return grid;
@@ -63,10 +74,13 @@ int** gen_plaquette(long long N) {
 int*** gen_grid(long long N, int id, int p) {
     int*** grid;
     int size;
-
+    // TODO NPROC TEM DE SER MENOR QUE N
     if (id == p-1 && N%p != 0) size = floor(N/p);
     else size = ceil(N/p);
-
+    if(size == 0) {
+        cout <<"Failed to allocate matrix\n";
+        exit(1);
+    }
     grid = (int ***) malloc(size * sizeof(int **));
 
     if(grid == NULL) {
@@ -75,7 +89,12 @@ int*** gen_grid(long long N, int id, int p) {
     }
     for(int x = 0; x < size; x++) {
         grid[x] = gen_plaquette(N);
+        if(grid[x] == NULL) {
+        cout <<"Failed to allocate matrix\n";
+        exit(1);
     }
+    }
+    //cout << sizeof(grid)/sizeof(int **) << endl;
     return grid;
 }
 void copyFromOrig(int*** orig, int*** grid, int id, int p, long long N) {
@@ -187,6 +206,7 @@ int visit_node(int*** grid, long long N, int x, int y, int z) {
             for (int zii : zi) {
                 int species = grid[xii][yii][zii];
                 if (species != 0){
+                    //cout << endl << xii << " " << yii << " " << zii << endl;
                     max[species-1]++;
                     sum++;
                 }    
@@ -265,7 +285,6 @@ int main(int argc, char *argv[])
     //cout << atoi(argv[1]) << " " << atoll(argv[2]) << " " << atof(argv[3]) << " " << atoi(argv[4]) << endl;
     MPI_Status status;
     double exec_time;
-    int*** orig = NULL;
     int*** grid1 = NULL;
     int*** grid2 = NULL;
     int** maximum = NULL;
@@ -278,20 +297,17 @@ int main(int argc, char *argv[])
     MPI_Comm_rank (MPI_COMM_WORLD, &id);
     MPI_Comm_size (MPI_COMM_WORLD, &p);
 
-    orig = gen_grid(N, 0, 1);
     maximum = new int*[N_SPECIES];
     for (int i = 0; i < N_SPECIES; i++) {
         maximum[i] = new int[2];
         maximum[i][0] = 0;
         maximum[i][1] = 0;
     }
-    orig = gen_grid(N, 0, 1);
-
-    gen_initial_grid(orig, N, atof(argv[3]), atoi(argv[4]));
 
     grid1 = gen_grid(N, id, p);
     grid2 = gen_grid(N, id, p);
-
+    gen_initial_grid(grid1, N, atof(argv[3]), atoi(argv[4]), id, p);
+    
     // maybe usar pares de plaquettes para se puder ir trocando tipo os grids
     upper = gen_plaquette(N);
     lower = gen_plaquette(N);
@@ -317,23 +333,21 @@ int main(int argc, char *argv[])
         }
         for (int i = 0; i< N;i++) {
             MPI_Irecv(&upper[i], N, MPI_INT, id-1, i, MPI_COMM_WORLD, &request3);        
-            MPI_Irecv(&lower[i], N, MPI_INT, (id+1)%p, (id+1)%p, MPI_COMM_WORLD, &request4);  
+            MPI_Irecv(&lower[i], N, MPI_INT, (id+1)%p, i, MPI_COMM_WORLD, &request4);  
         }
     }
     MPI_Wait(&request3, MPI_STATUS_IGNORE);
     MPI_Wait(&request4, MPI_STATUS_IGNORE);
     MPI_Wait(&request1, MPI_STATUS_IGNORE);
     MPI_Wait(&request2, MPI_STATUS_IGNORE);
-
-
-    copyFromOrig(orig, grid1, id, p, N);
+    
     MPI_Barrier (MPI_COMM_WORLD);
     exec_time = - MPI_Wtime();
     full_generation(grid1, grid2, maximum, atoi(argv[1]), N, atof(argv[3]), atoi(argv[4]));
     exec_time += MPI_Wtime();
-    MPI_Barrier (MPI_COMM_WORLD);
     if(!id){
         fprintf(stderr, "%.1fs\n", exec_time);
+        fflush(stderr);
         print_results(maximum);
     }
     MPI_Finalize();
