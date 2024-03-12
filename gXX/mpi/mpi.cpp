@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <cmath>
 #include <mpi.h>
+#include <algorithm>
 
 #define N_SPECIES 9
 using namespace std;
@@ -31,10 +32,9 @@ float r4_uni()
 // Genaration of initial grid
 void gen_initial_grid(int*** grid, long long N, float density, int input_seed, int id, int p)
 {
-    int start = id * (N / p);
-    int end;
-    if (id == p - 1) end = N; 
-    else end = start + (N / p);
+    int start = id * floor(N / p) + min(id, ((int)N)%p);
+    int end = (id+1)* floor(N / p) +  min(id+1, ((int)N)%p) -1;
+    //cout << "aaa" << id << " " << start << " " << end << endl;
 
     init_r4uni(input_seed);
     for (int x = 0; x < N; x++) {
@@ -42,8 +42,7 @@ void gen_initial_grid(int*** grid, long long N, float density, int input_seed, i
             for (int z = 0; z < N; z++) {
                 if(r4_uni() < density) {
                     int species = (int)(r4_uni() * N_SPECIES) + 1;
-                    if( x>=start && x<end) {
-                        //cout << x << " " << y << " " << z << id << endl;
+                    if( x>=start && x<=end) {
                         grid[x-start][y][z] = species;
                     }
                 }                
@@ -74,9 +73,10 @@ int** gen_plaquette(long long N) {
 int*** gen_grid(long long N, int id, int p) {
     int*** grid;
     int size;
+    double div = (float) N/p;
     // TODO NPROC TEM DE SER MENOR QUE N
-    if (id == p-1 && N%p != 0) size = floor(N/p);
-    else size = ceil(N/p);
+    if (id >= N%p) size = floor(div);
+    else size = ceil(div);
     //cout << "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"<< id<<" " <<size<<" " <<(id == p-1) << (N%p != 0) << " "<< floor(N/p) << endl;
     if(size == 0) {
         cout <<"Failed to allocate matrix\n";
@@ -98,20 +98,7 @@ int*** gen_grid(long long N, int id, int p) {
     //cout << sizeof(grid)/sizeof(int **) << endl;
     return grid;
 }
-void copyFromOrig(int*** orig, int*** grid, int id, int p, long long N) {
-    int start = id * (N / p);
-    int end;
-    if (id == p - 1) end = N; 
-    else end = start + (N / p);
 
-    for (int x = start; x < end; x++) {
-        for (int y = 0; y < N; y++) {
-            for (int z = 0; z < N; z++) {
-                grid[x - start][y][z] = orig[x][y][z];
-            }
-        }
-    }
-}
 
 
 // Prints the grid
@@ -261,10 +248,10 @@ int visit_node(int*** grid, int** recved, bool updown, long long N, int x, int y
 void info_of_gen(int*** grid, int id, int p,int** maximum, int epoch, long long N)
 {
     int size;
+    double div = (float) N/p;
     // TODO NPROC TEM DE SER MENOR QUE N
-    if (id == p-1 && N%p != 0) size = floor(N/p);
-    else size = ceil(N/p);
-
+    if (id >= N%p) size = floor(div);
+    else size = ceil(div);
     int maxNew[N_SPECIES] = {0};
     int max[N_SPECIES] = {0};
     #pragma omp parallel for collapse(2) reduction(+:max)
@@ -287,9 +274,10 @@ void info_of_gen(int*** grid, int id, int p,int** maximum, int epoch, long long 
 void gen_generation(int*** grid, int*** new_grid, int** upper, int ** lower, int id, int p, int** maximum, int epoch, long long N)
 {
     int size;
+    double div = (float) N/p;
     // TODO NPROC TEM DE SER MENOR QUE N
-    if (id == p-1 && N%p != 0) size = floor(N/p);
-    else size = ceil(N/p);
+    if (id >= N%p) size = floor(div);
+    else size = ceil(div);
     int maxNew[N_SPECIES] = {0};
     int max[N_SPECIES] = {0};
     #pragma omp parallel for reduction(+:max)
@@ -410,10 +398,10 @@ int main(int argc, char *argv[])
     upper = gen_plaquette(N);
     lower = gen_plaquette(N);
     
-    if(id == p-1){
-        size = N/p;
-    } else 
-        size = ceil(N/p);
+    double div = (float) N/p;
+    // TODO NPROC TEM DE SER MENOR QUE N
+    if (id >= N%p) size = floor(div);
+    else size = ceil(div);
     MPI_Request request1[N] = {0};
     MPI_Request request2[N] = {0};
     MPI_Request request3[N] = {0};
