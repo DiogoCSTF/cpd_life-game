@@ -43,7 +43,6 @@ void gen_initial_grid(int*** grid, long long N, float density, int input_seed, i
                 if(r4_uni() < density) {
                     int species = (int)(r4_uni() * N_SPECIES) + 1;
                     if( x>=start+1 && x<=end+1) {
-                        cout << start +1 << " " << end+1 << endl;
                         grid[x-start][y][z] = species;
                     }
                 }                
@@ -83,7 +82,7 @@ int*** gen_grid(long long N, int id, int p) {
         cout <<"Failed to allocate matrix\n";
         exit(1);
     }
-    grid = (int ***) malloc(size * sizeof(int **));
+    grid = (int ***) malloc((size+2) * sizeof(int **));
 
     if(grid == NULL) {
         cout <<"Failed to allocate matrix\n";
@@ -254,6 +253,7 @@ void gen_generation(int*** grid, int*** new_grid, int id, int p, int** maximum, 
     else size = ceil(div);
     int maxNew[N_SPECIES] = {0};
     int max[N_SPECIES] = {0};
+    #pragma omp parallel for reduction(+:max)
     for (int x = 1; x < size+1; x++) {
         int xi = (x == 1) ? size : (x - 1);
         //cout << x << " " << xi << endl;
@@ -293,7 +293,6 @@ void gen_generation(int*** grid, int*** new_grid, int id, int p, int** maximum, 
         MPI_Wait(&request1[i], MPI_STATUS_IGNORE);
         MPI_Wait(&request2[i], MPI_STATUS_IGNORE);
     }
-    cout<< "aaaaaabnb322b" << endl;
 
 }
 // meter a contagem do primeiro fora do timer e aqui trocar o visit para o inicio e o max para depois (e usar o newgrid)
